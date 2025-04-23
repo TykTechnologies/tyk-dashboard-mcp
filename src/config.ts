@@ -94,129 +94,195 @@ if (process.env.CONFIG_FILE) {
     }
 }
 
+// Process command-line arguments - don't set defaults here
+// We'll apply the priority order (CLI > ENV > config) after parsing
 const argv = yargs(hideBin(process.argv))
     .option('config', {
         alias: 'c',
         type: 'string',
-        description: 'Path to JSON configuration file',
-        default: process.env.CONFIG_FILE,
+        description: 'Path to JSON configuration file'
     })
     .option('spec', {
         alias: 's',
         type: 'string',
-        description: 'Path to the OpenAPI specification file',
-        default: jsonConfig.spec || process.env.OPENAPI_SPEC_PATH,
+        description: 'Path to the OpenAPI specification file'
     })
     .option('overlays', {
         alias: 'o',
         type: 'string', // Comma-separated paths
-        description: 'Comma-separated paths to OpenAPI overlay files',
-        default: jsonConfig.overlays || process.env.OPENAPI_OVERLAY_PATHS,
+        description: 'Comma-separated paths to OpenAPI overlay files'
     })
     .option('port', {
         alias: 'p',
         type: 'number',
-        description: 'Port for the MCP server',
-        default: jsonConfig.port || parseInt(process.env.MCP_SERVER_PORT || '8080', 10),
+        description: 'Port for the MCP server'
     })
     .option('targetUrl', {
         alias: 'u',
         type: 'string',
-        description: 'Target API base URL (overrides OpenAPI servers)',
-        default: jsonConfig.targetUrl || process.env.TARGET_API_BASE_URL,
+        description: 'Target API base URL (overrides OpenAPI servers)'
     })
     .option('whitelist', {
         alias: 'w',
         type: 'string',
-        description: 'Comma-separated operationIds or URL paths to include (supports glob patterns)',
-        default: jsonConfig.whitelist || process.env.MCP_WHITELIST_OPERATIONS,
+        description: 'Comma-separated operationIds or URL paths to include (supports glob patterns)'
     })
     .option('blacklist', {
         alias: 'b',
         type: 'string',
-        description: 'Comma-separated operationIds or URL paths to exclude (supports glob patterns, ignored if whitelist used)',
-        default: jsonConfig.blacklist || process.env.MCP_BLACKLIST_OPERATIONS,
+        description: 'Comma-separated operationIds or URL paths to exclude (supports glob patterns, ignored if whitelist used)'
     })
     // Add options for credentials as needed
     .option('apiKey', {
         type: 'string',
-        description: 'API Key for the target API',
-        default: jsonConfig.apiKey || process.env.API_KEY,
+        description: 'API Key for the target API'
     })
     .option('securitySchemeName', {
         type: 'string',
-        description: 'Name of the security scheme requiring the API Key',
-        default: jsonConfig.securitySchemeName || process.env.SECURITY_SCHEME_NAME
+        description: 'Name of the security scheme requiring the API Key'
     })
     .option('securityCredentials', {
         type: 'string',
-        description: 'JSON string containing security credentials for multiple schemes',
-        default: jsonConfig.securityCredentials ? 
-            (typeof jsonConfig.securityCredentials === 'string' ? 
-                jsonConfig.securityCredentials : 
-                JSON.stringify(jsonConfig.securityCredentials)) : 
-            process.env.SECURITY_CREDENTIALS,
+        description: 'JSON string containing security credentials for multiple schemes'
     })
     .option('headers', {
         type: 'string',
-        description: 'JSON string containing custom headers to include in all API requests',
-        default: jsonConfig.headers ? 
-            (typeof jsonConfig.headers === 'string' ? 
-                jsonConfig.headers : 
-                JSON.stringify(jsonConfig.headers)) : 
-            process.env.CUSTOM_HEADERS,
+        description: 'JSON string containing custom headers to include in all API requests'
     })
     .option('disableXMcp', {
         type: 'boolean',
-        description: 'Disable adding X-MCP: 1 header to all API requests',
-        default: jsonConfig.disableXMcp !== undefined ? 
-            jsonConfig.disableXMcp : 
-            process.env.DISABLE_X_MCP === 'true',
+        description: 'Disable adding X-MCP: 1 header to all API requests'
     })
     .help()
     .parseSync(); // Use parseSync or handle async parsing
 
-if (!argv.spec) {
+// Apply priority order: CLI arguments > Environment variables > Config file
+const getValueWithPriority = <T>(cliValue: T | undefined, envValue: T | undefined, configValue: T | undefined, defaultValue: T): T => {
+    if (cliValue !== undefined) return cliValue;
+    if (envValue !== undefined) return envValue;
+    if (configValue !== undefined) return configValue;
+    return defaultValue;
+};
+
+// Parse environment variables
+const envValues = {
+    specPath: process.env.OPENAPI_SPEC_PATH,
+    overlays: process.env.OPENAPI_OVERLAY_PATHS,
+    port: process.env.MCP_SERVER_PORT ? parseInt(process.env.MCP_SERVER_PORT, 10) : undefined,
+    targetUrl: process.env.TARGET_API_BASE_URL,
+    whitelist: process.env.MCP_WHITELIST_OPERATIONS,
+    blacklist: process.env.MCP_BLACKLIST_OPERATIONS,
+    apiKey: process.env.API_KEY,
+    securitySchemeName: process.env.SECURITY_SCHEME_NAME,
+    securityCredentials: process.env.SECURITY_CREDENTIALS,
+    headers: process.env.CUSTOM_HEADERS,
+    disableXMcp: process.env.DISABLE_X_MCP === 'true'
+};
+
+// Apply priority to key configuration values
+const specPath = getValueWithPriority(argv.spec, envValues.specPath, jsonConfig.spec, '');
+const overlays = getValueWithPriority(argv.overlays, envValues.overlays, jsonConfig.overlays, '');
+const port = getValueWithPriority(argv.port, envValues.port, jsonConfig.port, 8080);
+const targetUrl = getValueWithPriority(argv.targetUrl, envValues.targetUrl, jsonConfig.targetUrl, '');
+const whitelist = getValueWithPriority(argv.whitelist, envValues.whitelist, jsonConfig.whitelist, '');
+const blacklist = getValueWithPriority(argv.blacklist, envValues.blacklist, jsonConfig.blacklist, '');
+const apiKey = getValueWithPriority(argv.apiKey, envValues.apiKey, jsonConfig.apiKey, '');
+const securitySchemeName = getValueWithPriority(
+    argv.securitySchemeName, 
+    envValues.securitySchemeName, 
+    jsonConfig.securitySchemeName, 
+    ''
+);
+
+if (!specPath) {
     console.error("Error: OpenAPI specification path is required. Set OPENAPI_SPEC_PATH environment variable, use --spec option, or specify in config file.");
     process.exit(1);
 }
 
 // Parse security credentials if present
 let securityCredentials: Record<string, string> = {};
+
+// CLI has highest priority
 if (argv.securityCredentials) {
     try {
         securityCredentials = JSON.parse(argv.securityCredentials);
     } catch (e) {
-        console.error('Failed to parse security credentials JSON, using empty object instead:', e);
+        console.error('Failed to parse security credentials JSON from CLI:', e);
+    }
+} else if (envValues.securityCredentials) {
+    // Then environment variables
+    try {
+        securityCredentials = JSON.parse(envValues.securityCredentials);
+    } catch (e) {
+        console.error('Failed to parse security credentials JSON from ENV:', e);
+    }
+} else if (jsonConfig.securityCredentials) {
+    // Then config file
+    if (typeof jsonConfig.securityCredentials === 'string') {
+        try {
+            securityCredentials = JSON.parse(jsonConfig.securityCredentials);
+        } catch (e) {
+            console.error('Failed to parse security credentials JSON from config file:', e);
+        }
+    } else if (typeof jsonConfig.securityCredentials === 'object') {
+        securityCredentials = jsonConfig.securityCredentials;
     }
 }
 
-// Parse custom headers if present
+// Parse custom headers with same priority
 let customHeaders: Record<string, string> = { ...customHeadersFromEnv };
+
+// CLI has highest priority
 if (argv.headers) {
     try {
         const headersFromArg = JSON.parse(argv.headers);
         customHeaders = { ...customHeaders, ...headersFromArg };
     } catch (e) {
-        console.error('Failed to parse custom headers JSON, using headers from env vars only:', e);
+        console.error('Failed to parse custom headers JSON from CLI:', e);
+    }
+} else if (envValues.headers) {
+    // Then environment variables
+    try {
+        const headersFromEnv = JSON.parse(envValues.headers);
+        customHeaders = { ...customHeaders, ...headersFromEnv };
+    } catch (e) {
+        console.error('Failed to parse custom headers JSON from ENV:', e);
+    }
+} else if (jsonConfig.headers) {
+    // Then config file
+    if (typeof jsonConfig.headers === 'string') {
+        try {
+            const headersFromConfig = JSON.parse(jsonConfig.headers);
+            customHeaders = { ...customHeaders, ...headersFromConfig };
+        } catch (e) {
+            console.error('Failed to parse custom headers JSON from config file:', e);
+        }
+    } else if (typeof jsonConfig.headers === 'object') {
+        customHeaders = { ...customHeaders, ...jsonConfig.headers };
     }
 }
 
+// Determine disableXMcp value with correct priority
+const disableXMcp = argv.disableXMcp !== undefined ? argv.disableXMcp :
+                    envValues.disableXMcp !== undefined ? envValues.disableXMcp :
+                    jsonConfig.disableXMcp !== undefined ? jsonConfig.disableXMcp : false;
+
+// Generate the final configuration object with correct priorities applied
 export const config = {
-    specPath: isHttpUrl(argv.spec) ? argv.spec : path.resolve(argv.spec),
-    overlayPaths: argv.overlays
-        ? argv.overlays.split(',').map((p: string) => isHttpUrl(p.trim()) ? p.trim() : path.resolve(p.trim()))
+    specPath: isHttpUrl(specPath) ? specPath : path.resolve(specPath),
+    overlayPaths: overlays
+        ? overlays.split(',').map((p: string) => isHttpUrl(p.trim()) ? p.trim() : path.resolve(p.trim()))
         : [],
-    mcpPort: argv.port,
-    targetApiBaseUrl: argv.targetUrl, // Explicit config takes precedence
-    apiKey: argv.apiKey,
-    securitySchemeName: argv.securitySchemeName,
-    securityCredentials, // The parsed security credentials for multiple schemes
-    customHeaders, // Custom headers for all API requests
-    disableXMcp: argv.disableXMcp || false, // Flag to disable X-MCP header
+    mcpPort: port,
+    targetApiBaseUrl: targetUrl, // Now properly respects priority
+    apiKey,
+    securitySchemeName,
+    securityCredentials,
+    customHeaders,
+    disableXMcp,
     filter: {
-        whitelist: argv.whitelist ? argv.whitelist.split(',').map((pattern: string) => pattern.trim()) : null,
-        blacklist: argv.blacklist ? argv.blacklist.split(',').map((pattern: string) => pattern.trim()) : [],
+        whitelist: whitelist ? whitelist.split(',').map((pattern: string) => pattern.trim()) : null,
+        blacklist: blacklist ? blacklist.split(',').map((pattern: string) => pattern.trim()) : [],
     },
 };
 
