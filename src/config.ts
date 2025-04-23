@@ -31,21 +31,61 @@ function loadJsonConfig(configPath: string): Record<string, any> {
     return {};
 }
 
-// Default config file paths to check
-const defaultConfigPaths = [
-    path.resolve(process.cwd(), 'config.json'),
-    path.resolve(process.cwd(), 'openapi-mcp.json'),
-    path.resolve(process.cwd(), '.openapi-mcp.json')
-];
+// Get the package directory when running via npx
+function getPackageDirectory(): string | null {
+    try {
+        // When running via npx, __dirname will point to the package's bin directory
+        // We need to go up to the package root (from dist/src/ to package root)
+        const mainModulePath = require.main?.filename || '';
+        
+        // For a typical package structure, we need to go up several levels
+        // From <package>/dist/src/server.js to <package>
+        let packageDir = path.dirname(mainModulePath);
+        
+        // Go up to package root (typically 2 levels)
+        if (packageDir.includes('dist/src')) {
+            packageDir = path.resolve(packageDir, '../..');
+        } else if (packageDir.includes('dist')) {
+            packageDir = path.resolve(packageDir, '..');
+        }
+        
+        // Verify this looks like a package directory by checking for package.json
+        if (fs.existsSync(path.join(packageDir, 'package.json'))) {
+            return packageDir;
+        }
+    } catch (error) {
+        console.error('Error determining package directory:', error);
+    }
+    return null;
+}
 
-// Load configuration from default paths or environment variable
+// Get config paths to check
+function getConfigPaths(): string[] {
+    // Check if running as a package (via npx)
+    const packageDir = getPackageDirectory();
+    if (packageDir) {
+        const packageConfigPath = path.join(packageDir, 'config.json');
+        console.error(`Checking for package config at: ${packageConfigPath}`);
+        return [packageConfigPath];
+    } else {
+        // Fallback to current working directory if not running as a package
+        return [
+            path.resolve(process.cwd(), 'config.json'),
+            path.resolve(process.cwd(), 'openapi-mcp.json'),
+            path.resolve(process.cwd(), '.openapi-mcp.json')
+        ];
+    }
+}
+
+// Load configuration
 let jsonConfig: Record<string, any> = {};
 if (process.env.CONFIG_FILE) {
     // If CONFIG_FILE env var is set, try to load from that path
     jsonConfig = loadJsonConfig(process.env.CONFIG_FILE);
 } else {
-    // Otherwise, try default paths
-    for (const configPath of defaultConfigPaths) {
+    // Otherwise, try paths based on execution context
+    const configPaths = getConfigPaths();
+    for (const configPath of configPaths) {
         const config = loadJsonConfig(configPath);
         if (Object.keys(config).length > 0) {
             jsonConfig = config;
