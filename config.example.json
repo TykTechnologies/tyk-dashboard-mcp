@@ -1,37 +1,5 @@
 {
-  "// This is an example configuration file for OpenAPI to MCP Generator": "// Comments like this are for documentation only and should be removed in actual config",
-  
-  "// OpenAPI Specification Settings": "",
-  "// spec can be a local file path or HTTP/HTTPS URL": "",
   "spec": "./path/to/openapi-spec.json",
-  "// overlays can be comma-separated local file paths or HTTP/HTTPS URLs": "",
-  "overlays": "./path/to/overlay1.json,./path/to/overlay2.json",
-  "// Example with HTTP URLs": "",
-  "// spec": "https://example.com/api/openapi.json",
-  "// overlays": "https://example.com/api/overlay.json,./local/overlay.json",
-  
-  "// MCP Server Settings": "",
-  "port": 8080,
-  "targetUrl": "https://api.example.com",
-  
-  "// API Filtering": "",
-  "whitelist": "getPets,createPet,/pets/*",
-  "blacklist": "deletePet,/admin/*",
-  
-  "// Authentication & Security": "",
-  "apiKey": "your-api-key",
-  "securitySchemeName": "ApiKeyAuth",
-  "securityCredentials": {
-    "ApiKeyAuth": "your-api-key",
-    "OAuth2": "your-oauth-token"
-  },
-  
-  "// Custom Headers": "",
-  "headers": {
-    "X-Custom-Header": "custom-value",
-    "User-Agent": "OpenAPI-MCP-Client/1.0"
-  },
-  
-  "// Other Settings": "",
-  "disableXMcp": false
+  "overlays": "./path/to/overlay1.json,./path/to/overlay2.json",  
+  "targetUrl": "https://localhost:3000"
 }
