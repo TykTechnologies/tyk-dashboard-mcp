@@ -1,7 +1,7 @@
 {
-  "name": "@tyk-technologies/api-to-mcp",
+  "name": "@tyk-technologies/tyk-dashboard-mcp",
   "version": "1.0.0",
-  "description": "Generates MCP tool code from OpenAPI specs",
+  "description": "Tyk Dashboard MCP tool",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "type": "commonjs",
