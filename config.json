@@ -1,12 +1,4 @@
 {
-  "spec": "./specs/petstore-openapi.json",
-  "overlays": "./specs/petstore-overlay.json",
-  "port": 8080,
-  "targetUrl": "https://petstore3.swagger.io/api/v3",
-  "whitelist": "*",
-  "headers": {
-    "X-Custom-Header": "custom-value",
-    "User-Agent": "OpenAPI-MCP-Client/1.0"
-  },
-  "disableXMcp": false
+  "spec": "https://tyk.io/docs/others/dashboard-swagger.yml",
+  "targetUrl": "http://localhost:3000"
 }
