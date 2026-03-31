@@ -39,7 +39,7 @@ jobs:
           # Clear npm cache to avoid any corruption
           npm cache clean --force
           # Install dependencies with no legacy peer deps to avoid compatibility issues
-          npm install --no-fund --no-audit --prefer-offline --no-package-lock
+          npm ci
 
       - name: Update package version
         run: |
