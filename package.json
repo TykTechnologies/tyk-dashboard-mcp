@@ -57,7 +57,7 @@
     "@apidevtools/swagger-parser": "^10.1.0",
     "@modelcontextprotocol/sdk": "^1.10.2",
     "@types/minimatch": "^5.1.2",
-    "axios": "^1.6.7",
+    "axios": "1.6.7",
     "deepmerge": "^4.3.1",
     "dotenv": "^16.4.5",
     "js-yaml": "^4.1.0",
